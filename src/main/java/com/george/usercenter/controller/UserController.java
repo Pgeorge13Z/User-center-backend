@@ -28,7 +28,7 @@ import static com.george.usercenter.constant.UserConstant.USER_LOGIN_STATE;
  */
 @RestController
 @RequestMapping("/user")
-//@CrossOrigin(origins = {"http://82.156.242.159:81","http://localhost:8081"},allowCredentials = "true")
+@CrossOrigin(origins = {"http://129.226.152.209:80","http://localhost:8081","http://user.code-club.fun","http://user.code-club.fun:80"},allowCredentials = "true")
 public class UserController {
 
     @Resource
