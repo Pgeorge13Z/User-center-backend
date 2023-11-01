@@ -3,8 +3,8 @@ spring:
     name: user-center
   datasource:
     driver-class-name: com.mysql.jdbc.Driver
-    username: root
-    password: root
+    username: *
+    password: *
     url: jdbc:mysql://localhost:3306/user-center?useSSL=false
     # session失效时间
   session:
@@ -30,7 +30,7 @@ mybatis-plus:
 aliyun:
   oss:
     file:
-      endpoint: cos.ap-chongqing.myqcloud.com
-      bucketname: pgeorge-1310330018
-      keyid: AKID0vpgVOFBAA7xazgYN4c6VlusgS9oQzWz
-      keysecret: LSL0sX1MguzviHdptlRuKl7IH6i6JI5f
+      endpoint: "*********"
+      bucketname: "*********"
+      keyid: "*********"
+      keysecret: "*********"
