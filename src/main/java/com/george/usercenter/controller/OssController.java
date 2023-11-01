@@ -1,7 +1,9 @@
 package com.george.usercenter.controller;
 
 import com.george.usercenter.common.BaseResponse;
+import com.george.usercenter.common.ErrorCode;
 import com.george.usercenter.common.ResultUtils;
+import com.george.usercenter.exception.BusinessException;
 import com.george.usercenter.service.OssService;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -23,6 +25,9 @@ public class OssController {
         }
         //返回上传到oss的路径
         String url = ossService.uploadFileAvatar(file);
+        if (url==null)
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR,"上传图片失败");
+
         //返回r对象
         return ResultUtils.success(url);
     }

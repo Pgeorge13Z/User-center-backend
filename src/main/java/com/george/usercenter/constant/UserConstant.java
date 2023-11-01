@@ -19,4 +19,9 @@ public interface UserConstant {
      * 管理员
      */
     int ADMIN_ROLE = 1;
+
+    /**
+     * 盐值、混淆密码
+     */
+    String SALT = "salt";
 }

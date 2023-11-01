@@ -2,20 +2,25 @@ package com.george.usercenter.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.george.usercenter.common.ErrorCode;
+import com.george.usercenter.common.ResultUtils;
 import com.george.usercenter.exception.BusinessException;
+import com.george.usercenter.exception.ThrowUtils;
 import com.george.usercenter.model.domain.User;
 import com.george.usercenter.service.UserService;
 import com.george.usercenter.mapper.UserMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpSession;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static com.george.usercenter.constant.UserConstant.SALT;
 import static com.george.usercenter.constant.UserConstant.USER_LOGIN_STATE;
 
 
@@ -29,14 +34,14 @@ import static com.george.usercenter.constant.UserConstant.USER_LOGIN_STATE;
 public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     implements UserService {
 
-    /**
-     * 盐值、混淆密码
-     */
-    public static final String salt = "salt";
+
+
 
 
     @Resource
     UserMapper userMapper;
+
+
 
     @Override
 
@@ -84,7 +89,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
         // 加密
 
-        String encryptPassword = DigestUtils.md5DigestAsHex((userPassword+salt).getBytes());
+        String encryptPassword = DigestUtils.md5DigestAsHex((userPassword+SALT).getBytes());
 
         // 向数据库插入数据
         User user = new User();
@@ -126,7 +131,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"账户包含特殊字符");
 
         //todo 2.检验密码
-        String encryptPassword = DigestUtils.md5DigestAsHex((userPassword+salt).getBytes());
+        String encryptPassword = DigestUtils.md5DigestAsHex((userPassword+SALT).getBytes());
 
         QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
         userQueryWrapper.eq("userAccount",userAccount);
@@ -136,7 +141,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         // 用户不存在
         if (user==null){
             log.info("user login failed, userAccount con not match userPassword");
-               return null;
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "账号不存在或密码不正确");
         }
 
 
@@ -174,6 +179,83 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         request.getSession().removeAttribute(USER_LOGIN_STATE);
         return 1;
     }
+
+    @Override
+    public User getLoginUser(HttpServletRequest request) {
+        Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
+        User currentUser = (User)userObj;
+        if (currentUser == null)
+            throw new BusinessException(ErrorCode.NO_LOGIN,"未登录");
+
+        // 数据可能是实时变化的，用id去查库
+//        QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
+//        userQueryWrapper.eq("id",currentUser.getId());
+//
+//        userMapper.selectOne(userQueryWrapper);
+        //todo 校验用户是否合法，是否有状态位标记为不能使用之类的。
+
+        User user = userMapper.selectById(currentUser.getId());
+        //this.getById(currentUser.getId())
+        return user;
+    }
+
+    /**
+     *Mybatis-plus的更新操作
+     * 1. 根据id 更新
+     * User user = new User();
+     * user.setUserId(1);
+     * user.setAge(29);
+     *
+     * user.updateById();
+     *     or
+     * Integer rows = userMapper.updateById(user);
+     *
+     * 2. 条件参数更新
+     * UpdateWrapper<User> updateWrapper = new UpdateWrapper<>();
+     * updateWrapper.eq("name","shimin");
+     *
+     * User user = new User();
+     * user.setAge(18);
+     *
+     * Integer rows = userMapper.update(user, updateWrapper);
+     */
+
+    @Override
+    public boolean updateUserPassword(String oldPassword, String newPassword, HttpServletRequest request) {
+        if (StringUtils.isAnyBlank(oldPassword,newPassword)){
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"密码为空");
+        }
+
+        if (oldPassword.equals(newPassword))
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"新密码与旧密码相同");
+
+        if (newPassword.length()<8)
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"密码过短");
+
+        User loginUser = getLoginUser(request);
+
+        String oldEncryptPassword = DigestUtils.md5DigestAsHex((oldPassword+SALT).getBytes());
+        if (!loginUser.getUserPassword().equals(oldEncryptPassword))
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"当前密码输入错误");
+
+        Long id = loginUser.getId();
+
+        User user =new User();
+        user.setId(id);
+
+        //获取加密后新密码
+        String encryptPassword = DigestUtils.md5DigestAsHex((newPassword+SALT).getBytes());
+
+        user.setUserPassword(encryptPassword);
+        boolean result = updateById(user);
+        ThrowUtils.throwIf(!result,ErrorCode.SYSTEM_ERROR,"数据更新失败");
+
+        return true;
+
+
+    }
+
+
 }
 
 
