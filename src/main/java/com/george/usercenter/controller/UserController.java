@@ -125,6 +125,9 @@ public class UserController {
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"请求参数为空");
         }
         User user = new User();
+        if (userAddRequest.getAvatarUrl()==null){
+            userAddRequest.setAvatarUrl("https://pgeorge-1310330018.cos.ap-chongqing.myqcloud.com/202311020941065.png");
+        }
         BeanUtils.copyProperties(userAddRequest,user);
 
 
@@ -137,16 +140,16 @@ public class UserController {
     }
 
     @PostMapping("/delete")
-    public BaseResponse<Boolean> deleteUser(@RequestBody long id,HttpServletRequest request){
+    public BaseResponse<Boolean> deleteUser(@RequestBody UserDeleteRequest userDeleteRequest,HttpServletRequest request){
         //todo 一定要记得用户鉴权
         if (!isAdmin(request))
             throw new BusinessException(ErrorCode.NO_AUTH,"无管理员权限");
 
-        if (id<=0){
+        if (userDeleteRequest == null || userDeleteRequest.getId() <= 0){
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
 
-        boolean result = userService.removeById(id);
+        boolean result = userService.removeById(userDeleteRequest.getId());
         return ResultUtils.success(result);
     }
 
