@@ -4,6 +4,7 @@ import com.george.usercenter.model.domain.User;
 import com.baomidou.mybatisplus.extension.service.IService;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.List;
 
 /**
 * @author Pgeorge
@@ -61,4 +62,11 @@ public interface UserService extends IService<User> {
      * @return
      */
     boolean updateUserPassword(String oldPassword,String newPassword,HttpServletRequest request);
+
+    /**
+     * 根据用户标签搜索用户
+     * @param tagNameList 用户拥有的标签
+     * @return 脱敏后的用户
+     */
+    List<User> searchUsersByTags(List<String> tagNameList);
 }

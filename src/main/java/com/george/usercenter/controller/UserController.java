@@ -2,6 +2,7 @@ package com.george.usercenter.controller;
 
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.george.usercenter.common.BaseResponse;
 import com.george.usercenter.common.ErrorCode;
 import com.george.usercenter.common.ResultUtils;
@@ -11,15 +12,21 @@ import com.george.usercenter.mapper.UserMapper;
 import com.george.usercenter.model.domain.User;
 import com.george.usercenter.model.domain.request.*;
 import com.george.usercenter.service.UserService;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Controller;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.DigestUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static com.george.usercenter.constant.UserConstant.*;
@@ -28,8 +35,11 @@ import static com.george.usercenter.constant.UserConstant.*;
  * 用户接口
  */
 @RestController
+@Slf4j
 @RequestMapping("/user")
-@CrossOrigin(origins = {"http://129.226.152.209:80","http://localhost:8081","http://user.code-club.fun","http://user.code-club.fun:80"},allowCredentials = "true")
+//@CrossOrigin(origins = {"http://129.226.152.209:80","http://localhost:8081","http://127.0.0.1:5173/",
+//        "http://user.code-club.fun","http://user.code-club.fun:80"},allowCredentials = "true")
+//@CrossOrigin(origins ={"http://127.0.0.1:5173"},allowCredentials = "true")
 public class UserController {
 
     @Resource
@@ -37,6 +47,9 @@ public class UserController {
 
     @Resource
     UserMapper userMapper;
+
+    @Resource
+    RedisTemplate<String,Object> redisTemplate;
 
     @PostMapping("/register")
     public BaseResponse<Long> userRegister(@RequestBody UserRegisterRequest userRegisterRequest){
@@ -116,6 +129,43 @@ public class UserController {
         return ResultUtils.success(result);
     }
 
+    @GetMapping("/recommend")
+    public BaseResponse<Page<User>> userSearch(@RequestParam long pageSize,@RequestParam long pageNum, HttpServletRequest request){
+        User loginUser = userService.getLoginUser(request);
+        ValueOperations<String, Object> valueOperations = redisTemplate.opsForValue();
+       //设置该方法的redisKey
+        String redisKey = String.format("PalLink:user:recommend:%s",loginUser.getId());
+
+        //如果redis有数据直接取出来
+        Page<User> userPage = (Page<User>)valueOperations.get(redisKey);
+        if (userPage!=null) {
+            return ResultUtils.success(userPage);
+        }
+        //如果没有数据，从数据库读，并存入redis中
+        QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
+        userPage = userService.page(new Page<>(pageNum ,pageSize),userQueryWrapper);
+        //写缓存
+        try {
+            valueOperations.set(redisKey,userPage,30000, TimeUnit.MINUTES);
+        } catch (Exception e) {
+            log.error("redis set key error",e);
+        }
+
+        return ResultUtils.success(userPage);
+    }
+
+
+    @GetMapping("/search/tags")
+    public BaseResponse<List<User>> searchUsersByTags(@RequestParam(required = false) List<String> tagNameList) {
+        if (CollectionUtils.isEmpty(tagNameList)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+
+        List<User> users = userService.searchUsersByTags(tagNameList);
+        System.out.println(users);
+        return ResultUtils.success(users);
+    }
+
     @PostMapping("/add")
     public BaseResponse<Long> addUser(@RequestBody UserAddRequest userAddRequest,HttpServletRequest request){
         if (!isAdmin(request)){
@@ -153,12 +203,26 @@ public class UserController {
         return ResultUtils.success(result);
     }
 
-    @GetMapping("/current")
-    public BaseResponse<User> getCurrentUser(HttpServletRequest request){
-        User loginUser = userService.getLoginUser(request);
-        User safetyUser = userService.getSafetyUser(loginUser);
-        return ResultUtils.success(safetyUser);
+//    @GetMapping("/current")
+//    public BaseResponse<User> getCurrentUser(HttpServletRequest request){
+//        User loginUser = userService.getLoginUser(request);
+//        User safetyUser = userService.getSafetyUser(loginUser);
+//        return ResultUtils.success(safetyUser);
+//    }
+@GetMapping("/current")
+public BaseResponse<User> getCurrentUser(HttpServletRequest request) {
+    Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
+    User currentUser = (User) userObj;
+    if (currentUser == null) {
+        throw new BusinessException(ErrorCode.NO_LOGIN);
     }
+    long userId = currentUser.getId();
+    // TODO 校验用户是否合法
+    User user = userService.getById(userId);
+    User safetyUser = userService.getSafetyUser(user);
+    return ResultUtils.success(safetyUser);
+}
+
 
 
     /**
@@ -204,7 +268,7 @@ public class UserController {
     }
 
     @PostMapping("/update")
-    public BaseResponse<Boolean> updateUser(@RequestBody UserUpdateRequest userUpdateRequest,HttpServletRequest request){
+    public BaseResponse<Integer> updateUser(@RequestBody UserUpdateRequest userUpdateRequest,HttpServletRequest request){
         if (!isAdmin(request)) {
             throw new BusinessException(ErrorCode.NO_AUTH, "无权限");
         }
@@ -214,9 +278,11 @@ public class UserController {
         }
         User user = new User();
         BeanUtils.copyProperties(userUpdateRequest,user);
-        boolean result = userService.updateById(user);
-        ThrowUtils.throwIf(!result,ErrorCode.SYSTEM_ERROR);
-        return ResultUtils.success(true,"更新信息成功");
+        int res = userMapper.updateById(user);
+        return ResultUtils.success(res,"更新信息成功");
+//        boolean result = userService.updateById(user);
+//        ThrowUtils.throwIf(!result,ErrorCode.SYSTEM_ERROR);
+//        return ResultUtils.success(true,"更新信息成功");
     }
 
 

@@ -1,7 +1,9 @@
 package com.george.usercenter.service;
+import java.util.Arrays;
 import java.util.Date;
 
 import com.george.usercenter.model.domain.User;
+import org.junit.Assert;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -77,5 +79,13 @@ public class UserServiceTest {
         result= userService.userRegister(userAccount,userPassword,checkPassword,planetCode);
         Assertions.assertTrue(result>0);
 
+    }
+
+    @Test
+    void testSearchUsersByTags(){
+        List<String> tagNameList = Arrays.asList("java","go");
+        List<User> users = userService.searchUsersByTags(tagNameList);
+
+        Assert.assertNotNull(users);
     }
 }

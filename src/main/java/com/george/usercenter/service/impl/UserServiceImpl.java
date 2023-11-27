@@ -2,23 +2,28 @@ package com.george.usercenter.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.george.usercenter.common.ErrorCode;
-import com.george.usercenter.common.ResultUtils;
 import com.george.usercenter.exception.BusinessException;
 import com.george.usercenter.exception.ThrowUtils;
 import com.george.usercenter.model.domain.User;
 import com.george.usercenter.service.UserService;
 import com.george.usercenter.mapper.UserMapper;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.DigestUtils;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpSession;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static com.george.usercenter.constant.UserConstant.SALT;
 import static com.george.usercenter.constant.UserConstant.USER_LOGIN_STATE;
@@ -173,6 +178,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         safetyUser.setCreateTime(user.getCreateTime());
         safetyUser.setUserRole(user.getUserRole());
         safetyUser.setPlanetCode(user.getPlanetCode());
+        safetyUser.setTags(user.getTags());
         return safetyUser;
     }
 
@@ -184,6 +190,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
     @Override
     public User getLoginUser(HttpServletRequest request) {
+        if (request == null) {
+            return null;
+        }
         Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
         User currentUser = (User)userObj;
         if (currentUser == null)
@@ -257,8 +266,67 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
     }
 
+    /**
+     * 在内存中查询，更灵活
+     * @param tagNameList 用户拥有的标签
+     * @return
+     */
+    @Override
+    public List<User> searchUsersByTags(List<String> tagNameList) {
+        if (CollectionUtils.isEmpty(tagNameList)) {
+            throw new BusinessException(ErrorCode.NULL_ERROR,"无请求标签");
+        }
+        QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
+        List<User> userList = userMapper.selectList(userQueryWrapper);
+        Gson gson = new Gson();
+
+        return  userList.stream().filter( user -> {
+            String tags = user.getTags();
+            if (StringUtils.isBlank(tags))
+                return false;
+            Set<String> tagNameSet = gson.fromJson(tags, new TypeToken<Set<String>>() {
+            }.getType());
+            //tagNameSet = Optional.ofNullable(tagNameSet).orElse(new HashSet<>());
+            //对象转回json
+            // gson.toJson(tagNameSet)
+            for (String tagName : tagNameList) {
+                if (!tagNameSet.contains(tagName))
+                    return false;
+            }
+            return true;
+                }
+        ).map(this::getSafetyUser).collect(Collectors.toList());
+
+        }
+
+    /**
+     * 数据库查询
+     * @param tagNameList
+     * @return
+     */
+    @Deprecated
+    private List<User> searchUsersByTagsBySql(List<String> tagNameList) {
+        if (CollectionUtils.isEmpty(tagNameList)) {
+            throw new BusinessException(ErrorCode.NULL_ERROR,"无请求标签");
+        }
+
+
+        QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
+        for (String tagName : tagNameList) {
+            userQueryWrapper.like("tags",tagName);
+        }
+
+        List<User> users = userMapper.selectList(userQueryWrapper);
+        return users.stream().map(this::getSafetyUser).collect(Collectors.toList());
+
+
+
+    }
+
+
 
 }
+
 
 
 
