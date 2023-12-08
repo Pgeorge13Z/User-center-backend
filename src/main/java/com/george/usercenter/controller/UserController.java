@@ -6,25 +6,24 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.george.usercenter.common.BaseResponse;
 import com.george.usercenter.common.ErrorCode;
 import com.george.usercenter.common.ResultUtils;
+import com.george.usercenter.constant.RedisKeyName;
 import com.george.usercenter.exception.BusinessException;
 import com.george.usercenter.exception.ThrowUtils;
 import com.george.usercenter.mapper.UserMapper;
 import com.george.usercenter.model.domain.User;
-import com.george.usercenter.model.domain.request.*;
+import com.george.usercenter.model.request.*;
 import com.george.usercenter.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
-import org.springframework.stereotype.Controller;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.DigestUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -97,7 +96,7 @@ public class UserController {
     public BaseResponse<List<User>> userSearch(UserSearchRequest userSearchRequest, HttpServletRequest request){
         //todo 一定要记得用户鉴权
 
-        if (!isAdmin(request)){
+        if (!userService.isAdmin(request)){
             throw new BusinessException(ErrorCode.NO_AUTH,"无管理员权限");
         }
 
@@ -130,11 +129,11 @@ public class UserController {
     }
 
     @GetMapping("/recommend")
-    public BaseResponse<Page<User>> userSearch(@RequestParam long pageSize,@RequestParam long pageNum, HttpServletRequest request){
+    public BaseResponse<Page<User>> userRecommend(@RequestParam long pageSize,@RequestParam long pageNum, HttpServletRequest request){
         User loginUser = userService.getLoginUser(request);
         ValueOperations<String, Object> valueOperations = redisTemplate.opsForValue();
        //设置该方法的redisKey
-        String redisKey = String.format("PalLink:user:recommend:%s",loginUser.getId());
+        String redisKey = String.format(RedisKeyName.USER_RECOMMEND+":%s",loginUser.getId());
 
         //如果redis有数据直接取出来
         Page<User> userPage = (Page<User>)valueOperations.get(redisKey);
@@ -167,8 +166,8 @@ public class UserController {
     }
 
     @PostMapping("/add")
-    public BaseResponse<Long> addUser(@RequestBody UserAddRequest userAddRequest,HttpServletRequest request){
-        if (!isAdmin(request)){
+    public BaseResponse<Long> addUser(@RequestBody UserAddRequest userAddRequest, HttpServletRequest request){
+        if (!userService.isAdmin(request)){
             throw new BusinessException(ErrorCode.NO_AUTH,"无管理员权限");
         }
         if (userAddRequest == null){
@@ -190,9 +189,9 @@ public class UserController {
     }
 
     @PostMapping("/delete")
-    public BaseResponse<Boolean> deleteUser(@RequestBody UserDeleteRequest userDeleteRequest,HttpServletRequest request){
+    public BaseResponse<Boolean> deleteUser(@RequestBody UserDeleteRequest userDeleteRequest, HttpServletRequest request){
         //todo 一定要记得用户鉴权
-        if (!isAdmin(request))
+        if (!userService.isAdmin(request))
             throw new BusinessException(ErrorCode.NO_AUTH,"无管理员权限");
 
         if (userDeleteRequest == null || userDeleteRequest.getId() <= 0){
@@ -225,17 +224,7 @@ public BaseResponse<User> getCurrentUser(HttpServletRequest request) {
 
 
 
-    /**
-     * 检验是否为管理员
-     * @param request
-     * @return false:不是管理员 true:为管理员
-     */
-    public boolean isAdmin(HttpServletRequest request){
-        Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
-        User user = (User)userObj;
 
-        return user!=null && user.getUserRole()==ADMIN_ROLE;
-    }
 
     @PostMapping("/update/password")
     public BaseResponse<Boolean> updateUserPassword(@RequestBody UserUpdatePasswordRequest userUpdatePasswordRequest, HttpServletRequest request){
@@ -268,8 +257,8 @@ public BaseResponse<User> getCurrentUser(HttpServletRequest request) {
     }
 
     @PostMapping("/update")
-    public BaseResponse<Integer> updateUser(@RequestBody UserUpdateRequest userUpdateRequest,HttpServletRequest request){
-        if (!isAdmin(request)) {
+    public BaseResponse<Integer> updateUser(@RequestBody UserUpdateRequest userUpdateRequest, HttpServletRequest request){
+        if (!userService.isAdmin(request)) {
             throw new BusinessException(ErrorCode.NO_AUTH, "无权限");
         }
 
@@ -285,7 +274,15 @@ public BaseResponse<User> getCurrentUser(HttpServletRequest request) {
 //        return ResultUtils.success(true,"更新信息成功");
     }
 
+    @GetMapping("/match")
+    public BaseResponse<List<User>> matchUser(long num,HttpServletRequest request){
+        if (num<=0 || num>20) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR,"参数错误");
+        }
 
+        User loginUser = userService.getLoginUser(request);
+        return ResultUtils.success(userService.matchUser(num,loginUser));
+    }
 
 
 }

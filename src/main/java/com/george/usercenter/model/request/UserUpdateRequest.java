@@ -1,4 +1,4 @@
-package com.george.usercenter.model.domain.request;
+package com.george.usercenter.model.request;
 
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import lombok.Data;

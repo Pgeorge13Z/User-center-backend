@@ -1,14 +1,16 @@
-package com.george.usercenter.model.domain.request;
+package com.george.usercenter.model.request;
 
 import lombok.Data;
 
 import java.io.Serializable;
 
 @Data
-public class UserLoginRequest implements Serializable {
+public class UserRegisterRequest implements Serializable {
+
     private static final long serialVersionUID = -2672925408928677207L;
 
     private String userAccount;
     private String userPassword;
-
+    private String checkPassword;
+    private String planetCode;
 }

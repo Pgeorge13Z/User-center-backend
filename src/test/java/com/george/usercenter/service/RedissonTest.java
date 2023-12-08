@@ -3,6 +3,7 @@ package com.george.usercenter.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.george.usercenter.constant.RedisKeyName;
 import com.george.usercenter.model.domain.User;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
@@ -36,7 +37,7 @@ public class RedissonTest {
         RList<Object> list = redissonClient.getList("test-list");
         list.add("zxj");
 
-        RLock lock = redissonClient.getLock("palLink:preCachejob:doCache:lock");
+        RLock lock = redissonClient.getLock(RedisKeyName.PRECACHEJOB_DOCACHE_LOCK);
         try {
             if (lock.tryLock(0,-1, TimeUnit.MILLISECONDS)){
                 Thread.sleep(100000);

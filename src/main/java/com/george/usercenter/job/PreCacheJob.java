@@ -2,6 +2,7 @@ package com.george.usercenter.job;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.george.usercenter.constant.RedisKeyName;
 import com.george.usercenter.model.domain.User;
 import com.george.usercenter.service.UserService;
 import lombok.extern.slf4j.Slf4j;
@@ -35,7 +36,7 @@ public class PreCacheJob {
 
     @Scheduled(cron = "0 05  23 * * *")
     public void doCacheRecommendUser() {
-        RLock lock = redissonClient.getLock("palLink:preCachejob:doCache:lock");
+        RLock lock = redissonClient.getLock(RedisKeyName.PRECACHEJOB_DOCACHE_LOCK);
         try {
 
             if (lock.tryLock(0,-1,TimeUnit.MILLISECONDS)){
@@ -43,7 +44,7 @@ public class PreCacheJob {
                     QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
                     Page<User> userPage = userService.page(new Page<>(1 ,20),userQueryWrapper);
                     ValueOperations<String, Object> valueOperations = redisTemplate.opsForValue();
-                    String redisKey = String.format("PalLink:user:recommend:%s",userId);
+                    String redisKey = String.format(RedisKeyName.USER_RECOMMEND+":%s",userId);
 
                     //写缓存
                     try {
