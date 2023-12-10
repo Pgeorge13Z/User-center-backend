@@ -11,7 +11,7 @@ import com.george.usercenter.mapper.UserMapper;
 import com.george.usercenter.utils.AlgorithmUtils;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
-import javafx.util.Pair;
+
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -354,7 +354,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         List<String> tagList = gson.fromJson(tags, new TypeToken<List<String>>() {
         }.getType());
         //用户列表下标=》相似度
-        ArrayList<Pair<User, Long>> list = new ArrayList<>();
+//        ArrayList<Pair<User, Long>> list = new ArrayList<>();
+        HashMap<User, Long> map = new HashMap<>();
         for (int i = 0; i < userList.size(); i++) {
             User user = userList.get(i);
             String userTags = user.getTags();
@@ -363,16 +364,23 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             List<String> userTagList = gson.fromJson(userTags, new TypeToken<List<String>>() {
             }.getType());
             long distance = AlgorithmUtils.minDistance(tagList, userTagList);
-            list.add(new Pair<>(user, distance));
+//            list.add(new Pair<>(user, distance));
+            map.put(user,distance);
         }
             //按距离从小到大排序
-            List<Pair<User, Long>> topUserDistanceList
+//            List<Pair<User, Long>> topUserDistanceList
+//                    = list.stream().
+//                    sorted((a, b) -> (int) (a.getValue() - b.getValue()))
+//                    .limit(num)
+//                    .collect(Collectors.toList());
+        ArrayList<Map.Entry<User, Long>> list = new ArrayList<>(map.entrySet());
+                    List<Map.Entry<User, Long>> topUserDistanceList
                     = list.stream().
                     sorted((a, b) -> (int) (a.getValue() - b.getValue()))
                     .limit(num)
                     .collect(Collectors.toList());
 
-            List<Long> userIdList = topUserDistanceList.stream().map(pair -> pair.getKey().getId()).collect(Collectors.toList());
+        List<Long> userIdList = topUserDistanceList.stream().map(pair -> pair.getKey().getId()).collect(Collectors.toList());
             QueryWrapper<User> queryWrapper = new QueryWrapper<>();
             queryWrapper.in("id", userIdList);
             Map<Long, List<User>> userIdUserListMap =
